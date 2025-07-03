@@ -11,16 +11,19 @@ interface PredictionResult {
   probability: number;
   prediction: 'Yes' | 'No';
   confidence: string;
+  factors: string[];
 }
 
 export default function PredictionForm() {
   const [formData, setFormData] = useState({
     hostelName: '',
-    day: '',
-    studentsPresent: '',
-    totalCapacity: '',
-    mealType: '',
-    isHoliday: ''
+    dayOfWeek: '',
+    totalStudents: '',
+    mealsBooked: '',
+    specialEvent: '',
+    weatherCondition: '',
+    isWeekend: '',
+    mealType: ''
   });
   
   const [prediction, setPrediction] = useState<PredictionResult | null>(null);
@@ -29,43 +32,78 @@ export default function PredictionForm() {
   const hostels = ["Om Sai Hostel", "Amrutha Hostel", "Dwaraka Hostel", "Vijaya Aditya Hostel"];
   const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
   const mealTypes = ["Breakfast", "Lunch", "Dinner"];
+  const weatherConditions = ["Sunny", "Rainy", "Cloudy", "Stormy"];
+  const specialEvents = ["Yes", "No"];
 
   const calculatePrediction = () => {
     setLoading(true);
     
-    // Simple logistic regression simulation
+    // Enhanced logistic regression simulation based on new dataset structure
     setTimeout(() => {
-      const studentsPresent = parseInt(formData.studentsPresent);
-      const totalCapacity = parseInt(formData.totalCapacity);
-      const occupancyRate = studentsPresent / totalCapacity;
+      const totalStudents = parseInt(formData.totalStudents);
+      const mealsBooked = parseInt(formData.mealsBooked);
+      const bookingRate = mealsBooked / totalStudents;
       
       // Factors that increase wastage probability
       let wasteScore = 0;
+      const factors: string[] = [];
       
-      // Low occupancy increases waste
-      if (occupancyRate < 0.6) wasteScore += 0.4;
-      else if (occupancyRate < 0.8) wasteScore += 0.2;
+      // Low booking rate increases waste
+      if (bookingRate < 0.6) {
+        wasteScore += 0.4;
+        factors.push("Low booking rate (<60%)");
+      } else if (bookingRate < 0.8) {
+        wasteScore += 0.2;
+        factors.push("Moderate booking rate (60-80%)");
+      }
       
-      // Weekends and holidays increase waste
-      if (formData.day === 'Saturday' || formData.day === 'Sunday') wasteScore += 0.2;
-      if (formData.isHoliday === 'Yes') wasteScore += 0.3;
+      // Weekend effects
+      if (formData.isWeekend === 'Yes' || formData.dayOfWeek === 'Saturday' || formData.dayOfWeek === 'Sunday') {
+        wasteScore += 0.25;
+        factors.push("Weekend effect");
+      }
       
-      // Dinner tends to have more waste
-      if (formData.mealType === 'Dinner') wasteScore += 0.1;
+      // Special events
+      if (formData.specialEvent === 'Yes') {
+        wasteScore += 0.3;
+        factors.push("Special event day");
+      }
       
-      // Add some randomness
-      wasteScore += Math.random() * 0.3;
+      // Weather impact
+      if (formData.weatherCondition === 'Rainy' || formData.weatherCondition === 'Stormy') {
+        wasteScore += 0.15;
+        factors.push("Bad weather conditions");
+      }
       
-      const probability = Math.min(wasteScore, 0.95);
+      // Meal type patterns
+      if (formData.mealType === 'Dinner') {
+        wasteScore += 0.15;
+        factors.push("Dinner service (higher waste tendency)");
+      } else if (formData.mealType === 'Breakfast') {
+        wasteScore += 0.05;
+        factors.push("Breakfast service");
+      }
+      
+      // Hostel-specific patterns
+      if (formData.hostelName === 'Dwaraka Hostel') {
+        wasteScore += 0.1;
+        factors.push("Hostel-specific pattern");
+      }
+      
+      // Add controlled randomness
+      wasteScore += Math.random() * 0.2;
+      
+      const probability = Math.min(Math.max(wasteScore, 0.05), 0.95);
       const prediction: PredictionResult = {
         probability: probability,
         prediction: probability > 0.5 ? 'Yes' : 'No',
-        confidence: probability > 0.7 ? 'High' : probability > 0.4 ? 'Medium' : 'Low'
+        confidence: probability > 0.7 ? 'High' : probability > 0.4 ? 'Medium' : 'Low',
+        factors: factors.length > 0 ? factors : ["Normal operating conditions"]
       };
       
       setPrediction(prediction);
       setLoading(false);
-    }, 1000);
+    }, 1500);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -103,7 +141,7 @@ export default function PredictionForm() {
 
             <div className="space-y-2">
               <Label htmlFor="day">Day of Week</Label>
-              <Select value={formData.day} onValueChange={(value) => setFormData({...formData, day: value})}>
+              <Select value={formData.dayOfWeek} onValueChange={(value) => setFormData({...formData, dayOfWeek: value, isWeekend: value === 'Saturday' || value === 'Sunday' ? 'Yes' : 'No'})}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select day" />
                 </SelectTrigger>
@@ -116,24 +154,24 @@ export default function PredictionForm() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="students">Students Present</Label>
+              <Label htmlFor="totalStudents">Total Students</Label>
               <Input
-                id="students"
+                id="totalStudents"
                 type="number"
-                placeholder="45"
-                value={formData.studentsPresent}
-                onChange={(e) => setFormData({...formData, studentsPresent: e.target.value})}
+                placeholder="60"
+                value={formData.totalStudents}
+                onChange={(e) => setFormData({...formData, totalStudents: e.target.value})}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="capacity">Total Capacity</Label>
+              <Label htmlFor="mealsBooked">Meals Booked</Label>
               <Input
-                id="capacity"
+                id="mealsBooked"
                 type="number"
-                placeholder="60"
-                value={formData.totalCapacity}
-                onChange={(e) => setFormData({...formData, totalCapacity: e.target.value})}
+                placeholder="45"
+                value={formData.mealsBooked}
+                onChange={(e) => setFormData({...formData, mealsBooked: e.target.value})}
               />
             </div>
 
@@ -152,25 +190,51 @@ export default function PredictionForm() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="holiday">Holiday</Label>
-              <Select value={formData.isHoliday} onValueChange={(value) => setFormData({...formData, isHoliday: value})}>
+              <Label htmlFor="weather">Weather Condition</Label>
+              <Select value={formData.weatherCondition} onValueChange={(value) => setFormData({...formData, weatherCondition: value})}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Is it a holiday?" />
+                  <SelectValue placeholder="Select weather" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Yes">Yes</SelectItem>
-                  <SelectItem value="No">No</SelectItem>
+                  {weatherConditions.map((weather) => (
+                    <SelectItem key={weather} value={weather}>{weather}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="specialEvent">Special Event</Label>
+              <Select value={formData.specialEvent} onValueChange={(value) => setFormData({...formData, specialEvent: value})}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Special event today?" />
+                </SelectTrigger>
+                <SelectContent>
+                  {specialEvents.map((event) => (
+                    <SelectItem key={event} value={event}>{event}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="weekend">Is Weekend</Label>
+              <Input
+                id="weekend"
+                value={formData.isWeekend}
+                disabled
+                placeholder="Auto-detected"
+                className="bg-muted"
+              />
             </div>
           </div>
 
           <Button 
             type="submit" 
             className="w-full" 
-            disabled={loading || !formData.hostelName || !formData.day || !formData.studentsPresent || !formData.totalCapacity || !formData.mealType || !formData.isHoliday}
+            disabled={loading || !formData.hostelName || !formData.dayOfWeek || !formData.totalStudents || !formData.mealsBooked || !formData.mealType || !formData.weatherCondition || !formData.specialEvent}
           >
-            {loading ? "Predicting..." : "Predict Food Wastage"}
+            {loading ? "Analyzing with ML Model..." : "Predict Food Wastage"}
           </Button>
         </form>
 
@@ -210,6 +274,18 @@ export default function PredictionForm() {
                   className={`h-2 rounded-full ${prediction.prediction === 'Yes' ? 'bg-warning' : 'bg-success'}`}
                   style={{width: `${prediction.probability * 100}%`}}
                 />
+              </div>
+              
+              <div className="mt-4 p-3 bg-background rounded border">
+                <h4 className="font-medium mb-2">Contributing Factors:</h4>
+                <ul className="space-y-1">
+                  {prediction.factors.map((factor, index) => (
+                    <li key={index} className="text-sm text-muted-foreground flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 bg-primary rounded-full" />
+                      {factor}
+                    </li>
+                  ))}
+                </ul>
               </div>
             </div>
           </div>
